@@ -1,0 +1,939 @@
+/**
+ * Copyright © 2013GreatVision. All rights reserved.
+ *
+ * @Title: MainActivity.java
+ * @Prject: BananaTVLauncher
+ * @Package: com.gridviewtv.launcher
+ * @Description: TODO
+ * @author: Administrator  
+ * @date: 2013-9-22 上午10:18:23
+ * @version: V1.0
+ */
+package com.bananatv.custom.launcher.ui.activity;
+
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+import java.util.Locale;
+
+import android.app.Activity;
+import android.setting.settingservice.SettingManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.content.res.Resources;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
+import android.net.wifi.WifiManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Message;
+import android.util.DisplayMetrics;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.view.View.OnFocusChangeListener;
+import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.Animation.AnimationListener;
+import android.view.animation.AnimationUtils;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
+import android.widget.VideoView;
+
+import com.bananatv.custom.bananatvad.AdManager;
+import com.bananatv.custom.bananatvad.IAdCallback;
+import com.bananatv.custom.launcher.R;
+import com.bananatv.custom.launcher.R.string;
+import com.bananatv.custom.launcher.adapt.AppInfoAdapter;
+import com.bananatv.custom.launcher.adapt.AppInfoAdapter.OnDataChangedListener;
+import com.bananatv.custom.launcher.broadcast.NetworkStatusBroadcastReceiver;
+import com.bananatv.custom.launcher.dataprovider.util.LogUtils;
+import com.bananatv.custom.launcher.db.AllAppTable;
+import com.bananatv.custom.launcher.db.AppInfo;
+import com.bananatv.custom.launcher.ui.activity.fragment.AnimatorFinishedListener;
+import com.bananatv.custom.launcher.ui.dialog.DialogPrompt;
+import com.bananatv.custom.launcher.ui.dialog.DialogPrompt.DialogPromptListener;
+import com.bananatv.custom.launcher.ui.dialog.DialogPromptAdver;
+import com.bananatv.custom.launcher.ui.dialog.DialogRotationMenuNew.OnRotationMenuItemSelectedListener;
+import com.bananatv.custom.launcher.ui.dialog.DialogRotationMenuNew;
+import com.bananatv.custom.launcher.util.APKManager;
+import com.bananatv.custom.launcher.util.AppConstant;
+import com.bananatv.custom.launcher.util.Installer;
+import com.bananatv.custom.launcher.util.NetWorkUtils;
+import com.bananatv.custom.launcher.util.UpgradeHWInfoReader;
+import com.bananatv.custom.launcher.util.Installer.OnUninstallCompletedListener;
+import com.bananatv.custom.launcher.view.AppGridView;
+import com.bananatv.custom.launcher.view.ShowToast;
+
+/**
+ * Copyright © 2013GreatVision. All rights reserved.
+ * 
+ * @Title: MainActivity.java 
+ * @Prject: BananaTVLauncher
+ * @Package: com.gridviewtv.launcher
+ * @Description: TODO
+ * @author: 袁欢
+ * @date: 2013-9-22 上午10:18:23
+ * @version: V1.0
+ */
+public class MainActivity extends BaseActivity implements OnClickListener,
+	OnFocusChangeListener,AnimatorFinishedListener,AnimationListener,OnRotationMenuItemSelectedListener,
+	OnUninstallCompletedListener,IAdCallback{
+	
+	public LinearLayout llyt_main_bodyer;
+	private NetStatusBroadcastReceiver mNetStatusReceiver;
+	
+	private RelativeLayout[] rlyts = new RelativeLayout[3];// 倒影+内容
+	private RelativeLayout[] rlyts_content = new RelativeLayout[3];// 内容
+	private TextView[] tv_names = new TextView[3];// 名字
+	private ImageView[] iv_contents = new ImageView[3];// 图片
+	private RelativeLayout baseFramely,rlyadver,llyt_header_info,no_app_default;
+	private boolean isFirstIn = true;// 标识是否第一次进入activity
+	private AppGridView  gridview;
+	private Animation mAni_up_in, mAni_up_out, mAni_down_in, mAni_down_out;
+	private VideoView myVideoView;
+
+	private IBinder token;
+	private InputMethodManager imm;
+	private SettingManager sm;
+	private Activity mActivity;
+	private Context mContext;
+	private List<AppInfo> mAppList;
+	private AppInfoAdapter appAdapter;
+	private DialogRotationMenuNew menu;
+	private int currentItem = 0;
+	private int nTotolScreens = 0;
+	private int nCurrentScreen = 0;
+	private int selectedPosition = 0;
+
+	private ImageView image;
+	private ImageView pageUp;
+	private ImageView pageDown;
+	private TextView head_info_text;
+	
+	private TextView no_app;
+	private int size = -1,nsize = -1;
+	private String bitMapUrl = null;
+	private boolean isVideoView = true;
+	
+	private int currentPos = 0;
+
+
+	private static final int[] wallpaper_id = { R.drawable.wallpaper_0_1280_720,
+			R.drawable.wallpaper_1_1280_720, R.drawable.wallpaper_2_1280_720,
+			R.drawable.wallpaper_3_1280_720, R.drawable.wallpaper_4_1280_720,
+			R.drawable.wallpaper_5_1280_720 };
+	
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(null);
+		setContentView(R.layout.activity_main_tv);
+		mActivity = this;
+		mContext = this;
+		NetworkStatusBroadcastReceiver.mNetworkStatusChanges.clear();
+		initNetBoradCast();
+		initImm(MainActivity.this);
+		initLocalLang(MainActivity.this);
+		initView();
+		initAdvertise();
+		initGrideData();
+		initAnimation();
+	}
+		
+	private void initNetBoradCast() {
+		mNetStatusReceiver = new NetStatusBroadcastReceiver();
+		IntentFilter filter = new IntentFilter();
+		filter.addAction(WifiManager.RSSI_CHANGED_ACTION);
+		mContext.registerReceiver(mNetStatusReceiver, filter);
+		filter = new IntentFilter();
+		filter.addAction("android.net.conn.CONNECTIVITY_CHANGE");
+		filter.addAction("android.net.wifi.WIFI_STATE_CHANGED");
+		filter.addAction("android.net.wifi.STATE_CHANGE");
+		mContext.registerReceiver(mNetStatusReceiver, filter);
+	}
+
+	private void initGrideData() {
+		mAppList = AllAppTable.queryAllAppList();
+		size = mAppList.size();
+		appAdapter = new AppInfoAdapter(mActivity,mAppList);
+		gridview.setAdapter(appAdapter);
+		appAdapter.setOnDataChangedListener(new OnDataChangedListener() {
+		
+			@Override
+			public void onDataChanged(int nCurScreen, int dragPosition) {
+				LogUtils.getLog(getClass()).verbose("initGrideData");
+				onDataInit();
+				if(mAppList.size() != 0){
+					gridview.setVisibility(View.VISIBLE);
+					nCurrentScreen = nCurScreen;
+					setScreen(nCurrentScreen, dragPosition);
+				}else{
+					gridview.setVisibility(View.GONE);
+					pageUp.setVisibility(View.INVISIBLE);
+					pageDown.setVisibility(View.INVISIBLE);
+					no_app_default.setVisibility(View.VISIBLE);
+				}
+			}
+		});
+		
+		if(mAppList != null && mAppList.size() != 0){
+			gridview.setVisibility(View.VISIBLE);
+			setScreen(nCurrentScreen, selectedPosition);
+		}else{
+			gridview.setVisibility(View.GONE);
+		}
+		
+		gridview.setFastScrollEnabled(false);
+		gridview.setFastScrollAlwaysVisible(false);
+		gridview.setOnItemClickListener(new OnItemClickListener(){
+
+			@Override
+			public void onItemClick(AdapterView<?> arg0, View arg1, int pos,
+					long arg3) {
+				APKManager.startAPK(MainActivity.this, mAppList.get(pos + nCurrentScreen*12).getPackageName());
+			}
+		});
+	}
+
+	private void initView(){
+			baseFramely = (RelativeLayout)findViewById(R.id.BaseFrame);
+			llyt_header_info = (RelativeLayout)findViewById(R.id.llyt_header_info);
+			head_info_text = (TextView)findViewById(R.id.head_info_text);
+			
+			no_app_default = (RelativeLayout)findViewById(R.id.no_app_default);
+			no_app = (TextView)no_app_default.findViewById(R.id.tv_name_app);
+			
+			pageUp = (ImageView)findViewById(R.id.pageUp);
+			pageDown = (ImageView)findViewById(R.id.pageDown);
+			gridview = (AppGridView) findViewById(R.id.gridView1);
+			
+			baseFramely.setBackground(getLoacalBitmap(R.drawable.wallpaper_6_1280_720));
+			pageUp.setBackground(mActivity.getResources().getDrawable(R.drawable.page_up));
+			pageDown.setBackground(mActivity.getResources().getDrawable(R.drawable.page_down));
+			llyt_header_info.setBackground(getLoacalBitmap(R.drawable.head_info));
+			llyt_header_info.getBackground().setAlpha(255);
+			llyt_header_info.bringToFront();
+				
+			rlyts[0] = (RelativeLayout)findViewById(R.id.item_app_0);
+			rlyts_content[0] = (RelativeLayout)rlyts[0].findViewById(R.id.iv_app);
+			tv_names[0] = (TextView)rlyts[0].findViewById(R.id.tv_name_app);
+			iv_contents[0] = (ImageView)rlyts[0].findViewById(R.id.iv_icon_app);
+			iv_contents[0].setBackground(mActivity.getResources().getDrawable(R.drawable.appstore));
+			tv_names[0].setText("应用商城");
+			
+			rlyts[1] = (RelativeLayout)findViewById(R.id.item_app_1);
+			rlyts_content[1] = (RelativeLayout) rlyts[1].findViewById(R.id.iv_app);
+			tv_names[1] = (TextView)rlyts[1].findViewById(R.id.tv_name_app);
+			iv_contents[1] = (ImageView) rlyts[1].findViewById(R.id.iv_icon_app);
+			iv_contents[1].setBackground(mActivity.getResources().getDrawable(R.drawable.user));
+			tv_names[1].setText("用户中心");
+
+			rlyts[2] = (RelativeLayout)findViewById(R.id.item_app_2);
+			rlyts_content[2] = (RelativeLayout) rlyts[2].findViewById(R.id.iv_app);
+			tv_names[2] = (TextView)rlyts[2].findViewById(R.id.tv_name_app);
+			iv_contents[2] = (ImageView) rlyts[2].findViewById(R.id.iv_icon_app);
+			iv_contents[2].setBackground(mActivity.getResources().getDrawable(R.drawable.setting));
+			tv_names[2].setText("系统设置");
+			
+			for(int i = 0; i < rlyts.length; i++){
+				rlyts[i].setFocusable(true);
+				rlyts[i].setClickable(true);
+				rlyts[i].setOnClickListener(this);
+				rlyts[i].setOnFocusChangeListener(this);		
+				rlyts[i].setNextFocusUpId(R.id.imageAdver);
+			}
+			no_app_default.setFocusable(true);
+			no_app_default.setOnFocusChangeListener(this);
+			no_app_default.setOnClickListener(this);
+
+			rlyts[2].setNextFocusRightId(R.id.gridView1);
+			rlyts[0].setNextFocusLeftId(R.id.gridView1);
+	}
+	
+	private void initAdvertise() {
+		rlyadver = (RelativeLayout)findViewById(R.id.advertise);
+		rlyadver.setFocusable(true);
+		rlyadver.setOnClickListener(this);
+		rlyadver.setOnFocusChangeListener(this);
+		rlyadver.setNextFocusLeftId(R.id.gridView1);
+		rlyadver.setNextFocusRightId(R.id.gridView1);
+		rlyadver.setNextFocusDownId(R.id.item_app_0);
+		
+		image = (ImageView)findViewById(R.id.imageAdver);
+		myVideoView = (VideoView)findViewById(R.id.videoAdver);
+		
+		if(!isVideoView ){
+			image.setImageResource(R.drawable.adver_3);
+			rlyadver.requestFocus();
+			initAdvertiseData(0);
+		}else{
+			image.setVisibility(View.INVISIBLE);
+			myVideoView.setVisibility(View.VISIBLE);
+			initAdvertiseData(1);
+		}
+	}
+	
+	private void initAdvertiseData(int type) {
+		if(type == 0){
+			//获取广告实例
+			String server = "http://www.advertepg.com:5858";
+			String position = "com.bananatv.apps.tvbapp_guanggaoceshiBANAN001002";
+			int group = 0;	
+			String cpuid = UpgradeHWInfoReader.getCPUID();
+			String mac = UpgradeHWInfoReader.getMACAddr();		
+			AdManager adManager = getAdManagerInstance();
+			adManager.setAccessCode(mac, cpuid);
+			group = adManager.setAdCallback(this);
+			adManager.setServer(server);
+			adManager.addPosition(position);
+			adManager.activePosition(group, position,3);
+		}else{
+			myVideoView.setVideoPath("/sdcard/style.mp4");
+			myVideoView.start();
+		}
+	}
+	
+
+	public AdManager getAdManagerInstance(){
+		return AdManager.getAdManager(mActivity);
+	}
+
+	@SuppressWarnings("unused")
+	private void startFirstActivity() {
+		new Handler().postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				APKManager.startAPK(MainActivity.this, AllAppTable.queryAllAppList().get(0).getPackageName());
+			}
+		}, 1000);
+	}
+	
+	private void initAnimation() {
+		mAni_up_in = AnimationUtils.loadAnimation(this, R.anim.slide_in_top);
+		mAni_up_in.setFillAfter(false);
+		mAni_down_out = AnimationUtils.loadAnimation(this, R.anim.slide_out_bottom);
+		mAni_down_out.setFillAfter(false);
+
+		mAni_down_in = AnimationUtils.loadAnimation(this, R.anim.slide_in_bottom);
+		mAni_down_in.setFillAfter(false);
+		mAni_up_out = AnimationUtils.loadAnimation(this, R.anim.slide_out_top);
+		mAni_up_out.setFillAfter(false);
+	}
+	
+	Handler handler = new Handler(){
+		public void handleMessage(Message msg) {
+			switch(msg.what){
+			case 0:
+				pageUp.setVisibility(View.INVISIBLE);
+				pageDown.setVisibility(View.VISIBLE);
+				break;
+			case 1:
+				pageUp.setVisibility(View.VISIBLE);
+				pageDown.setVisibility(View.INVISIBLE);
+				break;
+			case 2:
+				pageUp.setVisibility(View.VISIBLE);
+				pageDown.setVisibility(View.VISIBLE);
+				break;
+			case 3:
+				pageUp.setVisibility(View.INVISIBLE);
+				pageDown.setVisibility(View.INVISIBLE);
+				break;
+			case 4:
+				llyt_header_info.setVisibility(View.VISIBLE);
+				head_info_text.setText(R.string.network_anomaly_head);
+				head_info_text.setTextColor(getResources().getColor(R.color.red_color));
+				break;
+			case 5:
+				llyt_header_info.setVisibility(View.INVISIBLE);
+				break;
+			case 6:
+				if(isVideoView){
+					image.setImageBitmap(getLoacalBitmap(bitMapUrl));
+				}else{
+					myVideoView.setVideoPath("/sdcard/style.mp4");
+					myVideoView.start();
+				}
+				break;
+			default:
+				break;
+			}
+		};
+	};
+	
+	@Override
+	protected void onResume() {
+		SharedPreferences spf = getSharedPreferences(AppConstant.SETTING_WALLPAPER, Context.MODE_PRIVATE);
+		int wallPaperIndex = spf.getInt(AppConstant.SETTING_WALLPAPER, 0);
+		getWindow().setBackgroundDrawableResource(wallpaper_id[wallPaperIndex]);
+		onAppAdapterResume();
+		onVideoDataResume();
+		super.onResume();
+	}
+	
+	private void onAppAdapterResume() {
+		appAdapter.callDataChangedListener(0);
+	}
+
+	private void onDataInit(){
+		LogUtils.getLog(getClass()).verbose("onDataInit");
+		mAppList = AllAppTable.queryAllAppList();
+		nsize = mAppList.size();
+//		if(nsize != size){
+		appAdapter.setDataList(mAppList);
+		appAdapter.notifyDataSetChanged();
+		appAdapter.notifyDataSetInvalidated();
+//}
+
+		if(size == 0){
+			gridview.setVisibility(View.GONE);
+			rlyadver.setNextFocusRightId(R.id.no_app_default);
+			rlyts[2].setNextFocusRightId(R.id.no_app_default);
+			no_app_default.setVisibility(View.VISIBLE);
+			pageUp.setVisibility(View.GONE);
+			pageDown.setVisibility(View.GONE);
+			no_app_default.requestFocus();
+			return;
+		}
+		
+		if(size < 0){
+			return;
+		}
+		
+		nTotolScreens = (nsize % 12 == 0) ? (nsize / 12): (nsize / 12 + 1);
+		Message msg = handler.obtainMessage();
+		if(nTotolScreens == 1){
+			msg.what = 3;
+		}else if(nCurrentScreen == nTotolScreens - 1){
+			msg.what = 1;
+		}else if(nCurrentScreen == 0){
+			msg.what = 0;
+		}else {
+			msg.what = 2;
+		}
+		handler.sendMessage(msg);
+	}
+	
+	private void onVideoDataResume() {
+		myVideoView.resume();
+		myVideoView.seekTo(currentPos);
+		myVideoView.start();
+	}
+	
+	private void onVideoDataPause() {
+		if(isVideoView && myVideoView.isPlaying()){
+			currentPos = myVideoView.getCurrentPosition();
+			myVideoView.pause();
+		}
+	}
+	
+	@Override
+	protected void onPostResume() {
+		super.onPostResume();
+	}
+	
+	private void setScreen(int nCurrentScreen, int dragPosition) {
+		if (nCurrentScreen >= nTotolScreens - 1 && nCurrentScreen > 0) {
+			nCurrentScreen = nTotolScreens - 1;
+		}
+		gridview.setPage(nCurrentScreen);
+		appAdapter.notifyDataSetInvalidated();
+		gridview.setSelection(dragPosition);
+		Message msg = handler.obtainMessage();
+		if(nTotolScreens == 1){
+			msg.what = 3;
+		}else if(nCurrentScreen == nTotolScreens - 1){
+			msg.what = 1;
+		}else if(nCurrentScreen == 0){
+			msg.what = 0;
+		}else {
+			msg.what = 2;
+		}
+		handler.sendMessage(msg);
+	}
+	
+	@Override
+	public void onWindowFocusChanged(boolean hasFocus) {
+		super.onWindowFocusChanged(hasFocus);
+		if(hasFocus){
+			if (isFirstIn) {
+				isFirstIn = false;
+				new Handler().postDelayed(new Runnable() {
+
+					@Override
+					public void run() {
+						UILApplication.simulateKey(KeyEvent.KEYCODE_0);
+					}
+				}, 200);
+			}
+		}
+	}
+
+	@Override
+	protected void onStop() {
+		UILApplication.isSwitchToHome = false;
+		super.onStop();
+	}
+
+	@Override
+	protected void onPause() {
+		UILApplication.isSwitchToHome = false;
+		selectedPosition = gridview.getSelectedItemPosition();
+		if(selectedPosition < 0){
+			selectedPosition = 0;
+		}
+		onVideoDataPause();
+		super.onPause();
+	}
+
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+	}
+	
+	@Override
+	protected void onNewIntent(Intent intent) {
+		super.onNewIntent(intent);  
+	}
+
+	@Override
+	protected void onRestoreInstanceState(Bundle arg0) {
+		arg0.clear();
+		super.onRestoreInstanceState(arg0);
+	}
+
+	@Override
+	public void onFocusChange(View v, boolean hasFocus) {
+		
+		switch(v.getId()){
+		case R.id.item_app_0:
+			LogUtils.getLog(getClass()).verbose("item_app_0");
+			if (!hasFocus) {
+				iv_contents[0].setBackgroundResource(R.drawable.appstore);
+				tv_names[0].setTextColor(getResources().getColor(R.color.text_app));
+			} else {
+				iv_contents[0].setBackgroundResource(R.drawable.appstore_f);
+				tv_names[0].setTextColor(getResources().getColor(R.color.text_bright));
+			}
+			break;
+		case R.id.item_app_1:
+			if (!hasFocus) {
+				iv_contents[1].setBackgroundResource(R.drawable.user);
+				tv_names[1].setTextColor(getResources().getColor(R.color.text_app));
+			} else {
+				iv_contents[1].setBackgroundResource(R.drawable.user_f);
+				tv_names[1].setTextColor(getResources().getColor(R.color.text_bright));
+			}
+			break;
+		case R.id.item_app_2:
+			if (!hasFocus) {
+				iv_contents[2].setBackgroundResource(R.drawable.setting);
+				tv_names[2].setTextColor(getResources().getColor(R.color.text_app));
+			} else {
+				iv_contents[2].setBackgroundResource(R.drawable.setting_f);
+				tv_names[2].setTextColor(getResources().getColor(R.color.text_bright));
+			}
+			break;
+		case R.id.advertise:
+			LogUtils.getLog(getClass()).verbose("advertise");
+			break;
+		case R.id.no_app_default:
+			LogUtils.getLog(getClass()).verbose("no_app_default");
+			if (!hasFocus) {
+				no_app_default.setBackgroundResource(R.drawable.app_back);
+				no_app.setTextColor(getResources().getColor(R.color.text_app));
+			}else{
+				no_app_default.setBackgroundResource(R.drawable.app_f);
+				no_app.setTextColor(getResources().getColor(R.color.text_bright));
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	@Override
+	public boolean dispatchKeyEvent(KeyEvent event) {
+		if (event.getKeyCode() == KeyEvent.KEYCODE_BACK) {
+			if (event.getAction() == KeyEvent.ACTION_DOWN) {
+			return false;
+			}
+		}
+		
+		int position = gridview.getSelectedItemPosition();
+		int count = gridview.getChildCount();
+		
+		if(gridview.isFocused()){
+			if (event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
+				if (event.getAction() == KeyEvent.ACTION_DOWN) {
+					currentItem = gridview.getSelectedItemPosition();
+					return doKeyMenu();
+				} else {
+					return true;
+				}
+			} else if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_UP) {
+				if (event.getAction() == KeyEvent.ACTION_DOWN) {
+					return doKeyUp(position, count, event);
+				} else {
+					return true;
+				}
+			} else if (event.getKeyCode() == KeyEvent.KEYCODE_DPAD_DOWN) {
+				if (event.getAction() == KeyEvent.ACTION_DOWN) {
+					return doKeyDown(position, count, event);
+				} else {
+					return true;
+				}
+			} else if (event.getKeyCode() == KeyEvent.KEYCODE_PAGE_UP) {
+				if (event.getAction() == KeyEvent.ACTION_DOWN) {
+					return doKeyPageDown();
+				} else {
+					return true;
+				}
+			} else if (event.getKeyCode() == KeyEvent.KEYCODE_PAGE_DOWN) {
+				if (event.getAction() == KeyEvent.ACTION_DOWN) {
+					return doKeyPageUp();
+				} else {
+					return true;
+				}
+			}
+		}
+
+		return super.dispatchKeyEvent(event);
+	}
+	
+
+	private boolean doKeyMenu() {
+		if (menu != null && menu.isShowing()) {
+			menu.dismiss();
+			menu = null;
+		} else{
+			menu = new DialogRotationMenuNew(mActivity);
+			menu.setOnRotationMenuItemSelectedListener(this);
+			menu.show();
+		}
+		return true;
+	}
+	
+	/**
+	 * 
+	 * @Title: doKeyLeft
+	 * @Description: TODO
+	 * @param position 选中item位置
+	 * @param count 当前页item总数
+	 * @param event
+	 * @return
+	 * @return: boolean
+	 */
+	private boolean doKeyUp(int position, int count, KeyEvent event) {
+		if(gridview.hasFocus()){
+			if (position == 0 || position == 1 
+					|| position == 2 || position == 3) {
+				if (nCurrentScreen != 0) {
+					nCurrentScreen--;
+					setScreen(nCurrentScreen, position+8);
+					gridview.startAnimation(mAni_up_in);
+					gridview.setSelection(position+8);
+				} 
+				return true;
+			}else{
+				gridview.setSelection(position-4);
+				return true;
+			}
+		}
+		return super.dispatchKeyEvent(event);
+	}
+
+	private boolean doKeyDown(int position, int count, KeyEvent event) {
+		if(gridview.hasFocus()){
+			if (position == 8 || position == 9 
+					|| position == 10 || position == 11) {
+				if (nCurrentScreen != nTotolScreens - 1) {
+					nCurrentScreen ++;
+					setScreen(nCurrentScreen, position-8);
+					gridview.startAnimation(mAni_down_in);
+					gridview.setSelection(position-8);
+				}else{
+					gridview.setSelection(count-1);
+				} 
+				return true;
+			}else if(position + 4 < count){
+				gridview.setSelection(position + 4);
+				return true;
+			}
+		}
+		return super.dispatchKeyEvent(event);
+	}
+
+	private boolean doKeyPageDown() {
+		if (nCurrentScreen < nTotolScreens - 1) {
+			nCurrentScreen++;
+			setScreen(nCurrentScreen, 0);
+			gridview.setSelection(0);
+		} else if (nCurrentScreen == nTotolScreens - 1) {
+		}
+		return true;
+	}
+
+	private boolean doKeyPageUp() {
+		if (nCurrentScreen > 0) {
+			nCurrentScreen--;
+			setScreen(nCurrentScreen, 0);
+			gridview.setSelection(0);
+		} else if (nCurrentScreen == 0) {
+		}
+		return true;
+	}	
+
+	@Override
+	public void onOutAnimatorFinished() {
+
+	}
+
+	private void initImm(Activity context) {
+		try {
+			View v = (View) getRootView(context);
+			token = v.getWindowToken();
+			imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
+			imm.setInputMethod(token, "com.sohu.inputmethod.sogoupad/.SogouIME");
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private View getRootView(Activity context) {
+		return ((ViewGroup) context.findViewById(android.R.id.content)).getChildAt(0);
+	}
+
+	private void initLocalLang(Context context) {
+		Context mContext;
+		Resources res;
+		Configuration config;
+		DisplayMetrics dm;
+
+		sm = (SettingManager) context.getSystemService(Context.SETTING_SERVICE);
+		String lang_type = sm.getCurLang();
+
+		mContext = context;
+		res = mContext.getResources();
+		config = res.getConfiguration();
+		dm = res.getDisplayMetrics();
+
+		if (lang_type.equals("zh_CN")) {
+			config.locale = Locale.SIMPLIFIED_CHINESE;
+		} else if (lang_type.equals("zh_TW")) {
+			config.locale = Locale.TRADITIONAL_CHINESE;
+		} else if (lang_type.equals("en")) {
+			config.locale = Locale.ENGLISH;
+		}
+		res.updateConfiguration(config, dm);
+	}
+
+	@Override
+	protected void switchToHome() {
+	}
+
+	@Override
+	public void onAnimationEnd(Animation arg0) {
+	}
+
+	@Override
+	public void onAnimationRepeat(Animation arg0) {
+	}
+
+	@Override
+	public void onAnimationStart(Animation arg0) {
+		
+	}
+	@Override
+	public void onClick(View view) {
+		switch(view.getId()){
+			case R.id.item_app_0:
+				APKManager.startSysApp(mActivity,AppConstant.APPSTORE_PACKAGENAME,
+						"com.bananatv.custom.appstore.ui.activity.LogoActivity");
+				break;
+			case R.id.item_app_1:
+				APKManager.startSysApp(mActivity,AppConstant.USERCENTER_PACKAGENAME,
+						"com.bananatv.custom.usercenter.activity.MainActivity");
+				break;
+			case R.id.item_app_2:
+				APKManager.startSysApp(mActivity,AppConstant.SETTING_PACKAGENAME,
+						"com.bananatv.custom.setting.MainActivity");
+				break;
+			case R.id.advertise:
+				creatDialogAdver();
+				break;
+			case R.id.no_app_default:
+				APKManager.startSysApp(mActivity,AppConstant.APPSTORE_PACKAGENAME,
+						"com.bananatv.custom.appstore.ui.activity.LogoActivity");
+				break;
+			default:
+				break;
+		}
+	}
+
+	@Override
+	public void OnRotationMenuItemSelected(int menuItem) {
+		String pkgName;
+		switch (menuItem) {
+		case DialogRotationMenuNew.UNINSTALL:
+			createDialogPrompt();
+			break;
+
+		case DialogRotationMenuNew.TOP:
+			pkgName = mAppList.get(currentItem).getPackageName();		
+			gridview.moveAPPToTop(pkgName);
+			break;
+
+		case DialogRotationMenuNew.MOVE:
+			gridview.startMoveAPP(mAppList.get(currentItem));
+			break;
+
+		case DialogRotationMenuNew.BOTTOM:
+			pkgName = mAppList.get(currentItem).getPackageName();
+			gridview.setTotalSize(mAppList.size());
+			gridview.moveAPPToBottpm(pkgName);
+			break;
+			
+		default:
+			break;
+		}
+	}
+	
+	public void createDialogPrompt() {
+		final DialogPrompt dialog = new DialogPrompt(mActivity, R.style.dialog_prompt);
+		final String appName = mAppList.get(currentItem + gridview.getPage()*12).getAppName();
+		final String packageName = mAppList.get(currentItem + gridview.getPage()*12).getPackageName();
+		dialog.setMessage(getResources().getString(R.string.msg_app_uninstall_prefix) + appName + getResources().getString(R.string.msg_app_uninstall_suffix));
+		dialog.setOnDialogPromptListener(new DialogPromptListener() {
+			@Override
+			public void OnClick(View view) {
+				switch (view.getId()) {
+				case R.id.dialog_prompt_sure: {
+					gridview.uninstallAPK(packageName);
+					dialog.dismiss();
+					break;
+				}
+				case R.id.dialog_prompt_cancel: {
+					dialog.dismiss();
+					break;
+				}
+				default:
+					break;
+				}
+			}
+		});
+		dialog.show();
+	}
+	
+	public void creatDialogAdver(){
+		final DialogPromptAdver dialog = new DialogPromptAdver(mActivity, R.style.dialog_prompt_adver);
+		dialog.show();
+	}
+	
+	public void uninstallAPK(String packageName) {
+
+		Installer mInstaller = new Installer();
+		mInstaller.PackageUnInstall(mActivity, packageName);
+		mInstaller.setOnUninstallCompletedListener(this);
+		new Thread(new Runnable() {
+
+			@Override
+			public void run() {
+				int progress = 0;
+				while (progress < 90) {
+					progress += 2;
+					try {
+						Thread.sleep(50);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}).start();
+	}
+
+	@Override
+	public void packageDeleted(String packageName, int returnCode) {
+		if (returnCode == Installer.UNINSTALL_SUCCEED) {
+			mAppList = AllAppTable.queryAllAppList();
+			removeAPPInfo();
+		}else {
+			ShowToast.getShowToast().createToast(mActivity, mActivity.getString(string.msg_app_uninstall_failed));
+		}
+	}
+	
+	private void removeAPPInfo() {
+		showAppUninstalledAnimation();
+		ShowToast.getShowToast().createToast(mActivity, mActivity.getString(string.msg_app_uninstall));
+	}
+
+	private void showAppUninstalledAnimation() {
+		
+	}
+	
+	private class NetStatusBroadcastReceiver extends BroadcastReceiver {
+		@Override
+		public void onReceive(Context context, Intent intent) {
+			if (intent.getAction().equalsIgnoreCase("android.net.conn.CONNECTIVITY_CHANGE")) {
+				Message msg = handler.obtainMessage();
+				if(NetWorkUtils.isNetConnected(context)){
+					msg.what = 5;
+				}else{
+					msg.what = 4;
+				}
+				handler.sendMessage(msg);
+			}
+		}
+	}
+
+	@Override
+	public void onAdChanged(int count, String position, String kind, 
+			String code, String name, String type, String adourl, String word,
+			String detailurl, String title, String summary, String inscribe,
+			String appcode, int showtime) {
+		
+			bitMapUrl = adourl;
+			Message msg = handler.obtainMessage();
+			msg.what = 6;
+			handler.sendMessage(msg);
+	}
+	
+    public Bitmap getLoacalBitmap(String url) {
+        try {
+            FileInputStream fis = new FileInputStream(url);
+            return BitmapFactory.decodeStream(fis); 
+          } catch (FileNotFoundException e) {
+             e.printStackTrace();
+             return null;
+        }
+   }
+     
+   public BitmapDrawable getLoacalBitmap(int resId){
+	    BitmapFactory.Options opt = new BitmapFactory.Options();
+	    opt.inPreferredConfig = Bitmap.Config.ARGB_8888;
+	    opt.inPurgeable = true;
+	    opt.inInputShareable = true;
+	    //获取资源图片
+	    InputStream is = mContext.getResources().openRawResource(resId);
+	    Bitmap bitmap = BitmapFactory.decodeStream(is,null, opt);
+	    try {
+			is.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	    return new BitmapDrawable(mContext.getResources(),bitmap); 
+   }
+}
